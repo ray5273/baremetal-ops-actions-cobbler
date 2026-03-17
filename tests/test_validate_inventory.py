@@ -38,7 +38,10 @@ class TestValidateInventory(unittest.TestCase):
                         "required": ["name", "mac_address", "ip_address", "netmask"],
                         "properties": {
                             "name": {"type": "string"},
-                            "mac_address": {"type": "string", "pattern": "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"},
+                            "mac_address": {
+                                "type": "string",
+                                "pattern": "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$",
+                            },
                             "ip_address": {"type": "string"},
                             "netmask": {"type": "string"},
                             "static": {"type": "boolean"},

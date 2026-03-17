@@ -43,10 +43,14 @@ class IPMIController:
         """
         cmd = [
             "ipmitool",
-            "-I", "lanplus",
-            "-H", self.bmc_ip,
-            "-U", self.username,
-            "-P", self.password,
+            "-I",
+            "lanplus",
+            "-H",
+            self.bmc_ip,
+            "-U",
+            self.username,
+            "-P",
+            self.password,
             *args,
         ]
         # 로그에 비밀번호 노출 방지
@@ -68,7 +72,9 @@ class IPMIController:
                 raise RuntimeError(f"ipmitool 실행 실패: {result.stderr.strip()}")
             return result
         except subprocess.TimeoutExpired:
-            logger.error("IPMI 명령 타임아웃 (%d초): %s", IPMI_TIMEOUT, " ".join(safe_cmd))
+            logger.error(
+                "IPMI 명령 타임아웃 (%d초): %s", IPMI_TIMEOUT, " ".join(safe_cmd)
+            )
             raise RuntimeError(f"ipmitool 타임아웃 ({IPMI_TIMEOUT}초)")
 
     def set_boot_pxe(self, efi: bool = True) -> None:

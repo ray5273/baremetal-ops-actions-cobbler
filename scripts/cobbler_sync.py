@@ -38,7 +38,9 @@ def apply_creates(
             continue
 
         if dry_run:
-            logger.info("[DRY-RUN] 신규 등록: %s (profile: %s)", name, config.get("profile"))
+            logger.info(
+                "[DRY-RUN] 신규 등록: %s (profile: %s)", name, config.get("profile")
+            )
         else:
             logger.info("신규 등록 중: %s", name)
             client.add_system(config)
@@ -74,7 +76,10 @@ def apply_updates(
             for change in changes:
                 logger.info(
                     "[DRY-RUN] 수정: %s.%s (%s → %s)",
-                    name, change["field"], change["from"], change["to"],
+                    name,
+                    change["field"],
+                    change["from"],
+                    change["to"],
                 )
         else:
             logger.info("수정 중: %s (%d개 필드)", name, len(changes))
@@ -118,17 +123,25 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Cobbler Sync - Git → Cobbler 동기화")
     parser.add_argument(
-        "--systems-dir", default="inventory/systems", help="시스템 YAML 디렉토리",
+        "--systems-dir",
+        default="inventory/systems",
+        help="시스템 YAML 디렉토리",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", default=True,
+        "--dry-run",
+        action="store_true",
+        default=True,
         help="실제 반영하지 않고 변경사항만 출력 (기본값)",
     )
     parser.add_argument(
-        "--apply", action="store_true", help="실제 Cobbler에 반영",
+        "--apply",
+        action="store_true",
+        help="실제 Cobbler에 반영",
     )
     parser.add_argument(
-        "--target", default=None, help="특정 시스템만 동기화",
+        "--target",
+        default=None,
+        help="특정 시스템만 동기화",
     )
 
     args = parser.parse_args()
@@ -153,7 +166,9 @@ def main() -> None:
 
     # Orphan 경고
     for item in diff["orphans"]:
-        logger.warning("⚠ 미관리 시스템: %s (Cobbler에 존재하지만 Git에 정의 없음)", item["name"])
+        logger.warning(
+            "⚠ 미관리 시스템: %s (Cobbler에 존재하지만 Git에 정의 없음)", item["name"]
+        )
 
     if not dry_run and (created > 0 or updated > 0):
         logger.info("Cobbler sync 실행 중...")

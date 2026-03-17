@@ -76,8 +76,14 @@ def validate_systems(
         errors = list(validator.iter_errors(data))
         if errors:
             for err in errors:
-                path_str = ".".join(str(p) for p in err.absolute_path) if err.absolute_path else "(root)"
-                logger.error("❌ %s - 스키마 오류 [%s]: %s", filepath.name, path_str, err.message)
+                path_str = (
+                    ".".join(str(p) for p in err.absolute_path)
+                    if err.absolute_path
+                    else "(root)"
+                )
+                logger.error(
+                    "❌ %s - 스키마 오류 [%s]: %s", filepath.name, path_str, err.message
+                )
             all_valid = False
             continue
 
@@ -85,7 +91,9 @@ def validate_systems(
         if data.get("name") != filename:
             logger.error(
                 "❌ %s - name 필드(%s)가 파일명(%s)과 일치하지 않음",
-                filepath.name, data.get("name"), filename,
+                filepath.name,
+                data.get("name"),
+                filename,
             )
             all_valid = False
 
@@ -94,7 +102,9 @@ def validate_systems(
         if profile not in valid_profiles:
             logger.error(
                 "❌ %s - 프로파일 '%s'이(가) 카탈로그에 없음 (사용 가능: %s)",
-                filepath.name, profile, ", ".join(valid_profiles),
+                filepath.name,
+                profile,
+                ", ".join(valid_profiles),
             )
             all_valid = False
 
@@ -104,7 +114,9 @@ def validate_systems(
             if mac in seen_macs:
                 logger.error(
                     "❌ %s - MAC 주소 %s가 %s와 중복",
-                    filepath.name, mac, seen_macs[mac],
+                    filepath.name,
+                    mac,
+                    seen_macs[mac],
                 )
                 all_valid = False
             else:
@@ -115,7 +127,9 @@ def validate_systems(
             if ip in seen_ips:
                 logger.error(
                     "❌ %s - IP 주소 %s가 %s와 중복",
-                    filepath.name, ip, seen_ips[ip],
+                    filepath.name,
+                    ip,
+                    seen_ips[ip],
                 )
                 all_valid = False
             else:
@@ -126,7 +140,9 @@ def validate_systems(
         if bmc_ip in seen_bmc_ips:
             logger.error(
                 "❌ %s - BMC IP %s가 %s와 중복",
-                filepath.name, bmc_ip, seen_bmc_ips[bmc_ip],
+                filepath.name,
+                bmc_ip,
+                seen_bmc_ips[bmc_ip],
             )
             all_valid = False
         else:
@@ -148,13 +164,19 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="서버 인벤토리 YAML 검증")
     parser.add_argument(
-        "--systems-dir", default="inventory/systems", help="시스템 YAML 디렉토리",
+        "--systems-dir",
+        default="inventory/systems",
+        help="시스템 YAML 디렉토리",
     )
     parser.add_argument(
-        "--schema", default="inventory/schema.yaml", help="스키마 파일 경로",
+        "--schema",
+        default="inventory/schema.yaml",
+        help="스키마 파일 경로",
     )
     parser.add_argument(
-        "--catalog", default="profiles/_catalog.yaml", help="프로파일 카탈로그 경로",
+        "--catalog",
+        default="profiles/_catalog.yaml",
+        help="프로파일 카탈로그 경로",
     )
 
     args = parser.parse_args()

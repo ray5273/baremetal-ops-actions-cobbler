@@ -44,7 +44,9 @@ def wait_for_ssh(
         except (socket.timeout, ConnectionRefusedError, OSError):
             logger.info(
                 "⏳ 시도 %d/%d - %s 아직 준비되지 않음...",
-                attempt, max_attempts, host,
+                attempt,
+                max_attempts,
+                host,
             )
             if attempt < max_attempts:
                 time.sleep(interval_seconds)
@@ -63,8 +65,12 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="SSH 접속 대기")
     parser.add_argument("hostname", help="대상 호스트명 또는 IP")
-    parser.add_argument("--timeout", type=int, default=30, help="최대 대기 시간 (분, 기본 30)")
-    parser.add_argument("--interval", type=int, default=60, help="폴링 간격 (초, 기본 60)")
+    parser.add_argument(
+        "--timeout", type=int, default=30, help="최대 대기 시간 (분, 기본 30)"
+    )
+    parser.add_argument(
+        "--interval", type=int, default=60, help="폴링 간격 (초, 기본 60)"
+    )
     parser.add_argument("--port", type=int, default=22, help="SSH 포트 (기본 22)")
 
     args = parser.parse_args()

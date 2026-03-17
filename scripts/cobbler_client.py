@@ -88,7 +88,11 @@ class CobblerClient:
         """
         profile_names = self._get_profile_names()
         if profile not in profile_names:
-            logger.error("프로파일이 존재하지 않음: %s (사용 가능: %s)", profile, ", ".join(profile_names))
+            logger.error(
+                "프로파일이 존재하지 않음: %s (사용 가능: %s)",
+                profile,
+                ", ".join(profile_names),
+            )
             raise SystemExit(1)
 
         handle = self.server.get_system_handle(system_name, self.token)
@@ -138,10 +142,14 @@ class CobblerClient:
             self.server.modify_system(handle, "gateway", config["gateway"], self.token)
 
         if "name_servers" in config:
-            self.server.modify_system(handle, "name_servers", config["name_servers"], self.token)
+            self.server.modify_system(
+                handle, "name_servers", config["name_servers"], self.token
+            )
 
         if "boot_loader" in config:
-            self.server.modify_system(handle, "boot_loader", config["boot_loader"], self.token)
+            self.server.modify_system(
+                handle, "boot_loader", config["boot_loader"], self.token
+            )
 
         if "comment" in config:
             self.server.modify_system(handle, "comment", config["comment"], self.token)

@@ -31,7 +31,9 @@ class TestCobblerDiff(unittest.TestCase):
         with open(filepath, "w") as f:
             yaml.dump(data, f)
 
-    def _make_git_system(self, name: str, profile: str = "rhel9-x86_64", ip: str = "10.0.1.1") -> dict:
+    def _make_git_system(
+        self, name: str, profile: str = "rhel9-x86_64", ip: str = "10.0.1.1"
+    ) -> dict:
         """Git 시스템 데이터를 생성한다."""
         return {
             "name": name,
@@ -51,7 +53,9 @@ class TestCobblerDiff(unittest.TestCase):
             ],
         }
 
-    def _make_cobbler_system(self, name: str, profile: str = "rhel9-x86_64", ip: str = "10.0.1.1") -> dict:
+    def _make_cobbler_system(
+        self, name: str, profile: str = "rhel9-x86_64", ip: str = "10.0.1.1"
+    ) -> dict:
         """Cobbler 시스템 데이터를 생성한다."""
         return {
             "name": name,
@@ -99,8 +103,12 @@ class TestCobblerDiff(unittest.TestCase):
 
     def test_profile_changed(self) -> None:
         """프로파일 변경 → UPDATE 테스트."""
-        self._write_system("srv01", self._make_git_system("srv01", profile="ubuntu2204-x86_64"))
-        client = self._make_mock_client([self._make_cobbler_system("srv01", profile="rhel9-x86_64")])
+        self._write_system(
+            "srv01", self._make_git_system("srv01", profile="ubuntu2204-x86_64")
+        )
+        client = self._make_mock_client(
+            [self._make_cobbler_system("srv01", profile="rhel9-x86_64")]
+        )
 
         diff = compute_diff(self.systems_dir, client)
 
@@ -114,7 +122,9 @@ class TestCobblerDiff(unittest.TestCase):
     def test_ip_changed(self) -> None:
         """IP 변경 → UPDATE 테스트."""
         self._write_system("srv01", self._make_git_system("srv01", ip="10.0.1.100"))
-        client = self._make_mock_client([self._make_cobbler_system("srv01", ip="10.0.1.1")])
+        client = self._make_mock_client(
+            [self._make_cobbler_system("srv01", ip="10.0.1.1")]
+        )
 
         diff = compute_diff(self.systems_dir, client)
 
@@ -137,11 +147,20 @@ class TestCobblerDiff(unittest.TestCase):
         # 신규 시스템
         self._write_system("new-srv", self._make_git_system("new-srv", ip="10.0.1.10"))
         # 변경된 시스템
-        self._write_system("changed-srv", self._make_git_system("changed-srv", profile="ubuntu2204-x86_64", ip="10.0.1.20"))
-        client = self._make_mock_client([
-            self._make_cobbler_system("changed-srv", profile="rhel9-x86_64", ip="10.0.1.20"),
-            self._make_cobbler_system("orphan-srv", ip="10.0.1.30"),
-        ])
+        self._write_system(
+            "changed-srv",
+            self._make_git_system(
+                "changed-srv", profile="ubuntu2204-x86_64", ip="10.0.1.20"
+            ),
+        )
+        client = self._make_mock_client(
+            [
+                self._make_cobbler_system(
+                    "changed-srv", profile="rhel9-x86_64", ip="10.0.1.20"
+                ),
+                self._make_cobbler_system("orphan-srv", ip="10.0.1.30"),
+            ]
+        )
 
         diff = compute_diff(self.systems_dir, client)
 

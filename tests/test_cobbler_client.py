@@ -12,7 +12,9 @@ class TestCobblerClient(unittest.TestCase):
     def _make_client(self, mock_server: MagicMock) -> CobblerClient:
         """모킹된 서버로 CobblerClient를 생성한다."""
         mock_server.login.return_value = "test-token"
-        with patch("scripts.cobbler_client.xmlrpc.client.ServerProxy", return_value=mock_server):
+        with patch(
+            "scripts.cobbler_client.xmlrpc.client.ServerProxy", return_value=mock_server
+        ):
             return CobblerClient("http://test/cobbler_api", "admin", "password")
 
     def test_login_success(self) -> None:
@@ -28,7 +30,9 @@ class TestCobblerClient(unittest.TestCase):
 
         mock_server = MagicMock()
         mock_server.login.side_effect = xmlrpc.client.Fault(1, "login failed")
-        with patch("scripts.cobbler_client.xmlrpc.client.ServerProxy", return_value=mock_server):
+        with patch(
+            "scripts.cobbler_client.xmlrpc.client.ServerProxy", return_value=mock_server
+        ):
             with self.assertRaises(SystemExit):
                 CobblerClient("http://test/cobbler_api", "admin", "wrong")
 
@@ -66,8 +70,12 @@ class TestCobblerClient(unittest.TestCase):
 
         client.set_system_profile("rack01-srv001", "rhel9-x86_64")
 
-        mock_server.get_system_handle.assert_called_once_with("rack01-srv001", "test-token")
-        mock_server.modify_system.assert_called_once_with("handle-123", "profile", "rhel9-x86_64", "test-token")
+        mock_server.get_system_handle.assert_called_once_with(
+            "rack01-srv001", "test-token"
+        )
+        mock_server.modify_system.assert_called_once_with(
+            "handle-123", "profile", "rhel9-x86_64", "test-token"
+        )
         mock_server.save_system.assert_called_once_with("handle-123", "test-token")
 
     def test_set_system_profile_invalid(self) -> None:
@@ -87,7 +95,9 @@ class TestCobblerClient(unittest.TestCase):
 
         client.enable_netboot("rack01-srv001")
 
-        mock_server.modify_system.assert_called_once_with("handle-123", "netboot_enabled", True, "test-token")
+        mock_server.modify_system.assert_called_once_with(
+            "handle-123", "netboot_enabled", True, "test-token"
+        )
         mock_server.save_system.assert_called_once()
 
     def test_sync(self) -> None:
