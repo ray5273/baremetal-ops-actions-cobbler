@@ -58,6 +58,9 @@ jobs:
       - name: Validate inventory schemas
         run: python scripts/validate_inventory.py
 
+      - name: Validate cluster definitions
+        run: python scripts/cluster_manager.py validate
+
   lint:
     name: "Lint & Type Check"
     runs-on: ubuntu-latest
@@ -101,7 +104,7 @@ jobs:
       - name: Lint YAML files
         run: |
           yamllint -d "{extends: default, rules: {line-length: {max: 200}, truthy: disable}}" \
-            inventory/ profiles/ .github/workflows/
+            inventory/ profiles/ clusters/ .github/workflows/
 
   workflow-validation:
     name: "Workflow Syntax Check"

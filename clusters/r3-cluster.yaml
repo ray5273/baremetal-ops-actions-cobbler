@@ -1,0 +1,15 @@
+name: r3-cluster
+description: "Rack 3 Ceph OSD 클러스터"
+default_profile: rhel9-x86_64
+use_efi: true
+rolling:
+  enabled: true
+  batch_size: 1
+  pause_between_batches: false
+nodes:
+  - name: rack01-srv001
+  - name: rack01-srv002
+tags:
+  - rack3
+  - production
+  - ceph

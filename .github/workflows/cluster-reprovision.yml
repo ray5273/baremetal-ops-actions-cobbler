@@ -1,0 +1,257 @@
+name: "🚀 Cluster Batch Reprovision"
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: "배포할 클러스터"
+        required: true
+        type: choice
+        options:
+          - r3-cluster
+          - r4-cluster
+          - r6-1-cluster
+      profile_override:
+        description: "프로파일 강제 지정 (비워두면 클러스터 기본값 사용)"
+        required: false
+        type: string
+        default: ""
+      confirm_cluster_name:
+        description: "⚠️ 클러스터명을 다시 입력하세요 (확인용)"
+        required: true
+        type: string
+
+jobs:
+  # ────────────────────────────────────────────
+  # 1. 사전 검증 & 배포 계획 생성
+  # ────────────────────────────────────────────
+  pre-check:
+    name: "🔍 사전 검증 & 배포 계획"
+    runs-on: [self-hosted, linux, cobbler-mgmt]
+    outputs:
+      deploy_plan: ${{ steps.plan.outputs.plan }}
+      total_batches: ${{ steps.plan.outputs.total_batches }}
+      rolling_enabled: ${{ steps.plan.outputs.rolling_enabled }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip3 install -r requirements.txt
+
+      - name: 클러스터명 확인
+        run: |
+          if [ "${{ inputs.cluster_name }}" != "${{ inputs.confirm_cluster_name }}" ]; then
+            echo "❌ 클러스터명이 일치하지 않습니다."
+            echo "   입력: ${{ inputs.cluster_name }}"
+            echo "   확인: ${{ inputs.confirm_cluster_name }}"
+            exit 1
+          fi
+          echo "✅ 클러스터명 확인 완료: ${{ inputs.cluster_name }}"
+
+      - name: 인벤토리 & 클러스터 검증
+        run: |
+          python3 scripts/validate_inventory.py
+          python3 scripts/cluster_manager.py validate
+
+      - name: 배포 계획 생성
+        id: plan
+        run: |
+          # 배포 계획을 JSON으로 추출
+          PLAN_JSON=$(python3 scripts/cluster_manager.py resolve "${{ inputs.cluster_name }}")
+          echo "plan=$PLAN_JSON" >> "$GITHUB_OUTPUT"
+
+          # 메타데이터 추출
+          TOTAL_BATCHES=$(echo "$PLAN_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['total_batches'])")
+          ROLLING=$(echo "$PLAN_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(str(d['rolling_enabled']).lower())")
+          echo "total_batches=$TOTAL_BATCHES" >> "$GITHUB_OUTPUT"
+          echo "rolling_enabled=$ROLLING" >> "$GITHUB_OUTPUT"
+
+          # 배포 계획을 Step Summary에 출력
+          python3 scripts/cluster_manager.py show "${{ inputs.cluster_name }}" --output-format github >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cobbler 시스템 존재 확인
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+        run: |
+          PLAN='${{ steps.plan.outputs.plan }}'
+          NODES=$(echo "$PLAN" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for batch in d['batches']:
+              for node in batch:
+                  print(node['name'])
+          ")
+
+          ALL_OK=true
+          for NODE in $NODES; do
+            OUTPUT=$(python3 scripts/cobbler_client.py get-system "$NODE" 2>&1) || {
+              echo "❌ Cobbler에 시스템이 없습니다: $NODE"
+              ALL_OK=false
+            }
+          done
+
+          if [ "$ALL_OK" != "true" ]; then
+            echo "❌ 일부 노드가 Cobbler에 등록되어 있지 않습니다."
+            exit 1
+          fi
+          echo "✅ 모든 노드 Cobbler 등록 확인 완료"
+
+  # ────────────────────────────────────────────
+  # 2. 클러스터 전체 배포
+  # ────────────────────────────────────────────
+  deploy-cluster:
+    name: "🚀 클러스터 배포"
+    needs: pre-check
+    runs-on: [self-hosted, linux, cobbler-mgmt]
+    environment: bare-metal-prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip3 install -r requirements.txt
+
+      - name: 클러스터 노드 일괄 배포
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+          IPMI_USER: ${{ secrets.IPMI_USER }}
+          IPMI_PASS: ${{ secrets.IPMI_PASS }}
+        run: |
+          set -euo pipefail
+
+          PLAN='${{ needs.pre-check.outputs.deploy_plan }}'
+          PROFILE_OVERRIDE="${{ inputs.profile_override }}"
+          TOTAL_BATCHES=$(echo "$PLAN" | python3 -c "import sys,json; print(json.load(sys.stdin)['total_batches'])")
+
+          BATCH_IDX=0
+          echo "$PLAN" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for bi, batch in enumerate(d['batches']):
+              for node in batch:
+                  print(f\"{bi}|{node['name']}|{node['profile']}|{node['bmc_ip']}|{node['use_efi']}\")
+          " | while IFS='|' read -r BATCH_NUM NAME PROFILE BMC_IP USE_EFI; do
+
+            # profile override 적용
+            if [ -n "$PROFILE_OVERRIDE" ]; then
+              PROFILE="$PROFILE_OVERRIDE"
+            fi
+
+            BATCH_DISPLAY=$((BATCH_NUM + 1))
+            echo ""
+            echo "════════════════════════════════════════"
+            echo "📦 배치 ${BATCH_DISPLAY}/${TOTAL_BATCHES} - 노드: ${NAME}"
+            echo "   프로파일: ${PROFILE}"
+            echo "   BMC IP: ${BMC_IP}"
+            echo "════════════════════════════════════════"
+
+            # Step 1: Cobbler 프로파일 설정 + Netboot 활성화
+            echo "🔧 [${NAME}] Cobbler 프로파일 설정 및 Netboot 활성화..."
+            python3 scripts/cobbler_client.py reprovision "${NAME}" "${PROFILE}"
+
+            # Step 2: IPMI PXE 부팅 설정 + 전원 재시작
+            echo "⚡ [${NAME}] IPMI PXE 부팅 설정 및 전원 재시작..."
+            EFI_FLAG=""
+            if [ "${USE_EFI}" = "True" ] || [ "${USE_EFI}" = "true" ]; then
+              EFI_FLAG="--efi"
+            fi
+            python3 scripts/ipmi_control.py pxe-boot "${BMC_IP}" ${EFI_FLAG}
+            python3 scripts/ipmi_control.py power-cycle "${BMC_IP}"
+
+            echo "✅ [${NAME}] PXE 부팅 트리거 완료"
+          done
+
+          echo ""
+          echo "🎯 모든 노드 PXE 부팅 트리거 완료. SSH 대기 시작..."
+
+      - name: OS 설치 완료 대기 (전체 노드)
+        run: |
+          set -euo pipefail
+
+          PLAN='${{ needs.pre-check.outputs.deploy_plan }}'
+
+          # 모든 노드에 대해 순차적으로 SSH 대기
+          echo "$PLAN" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for batch in d['batches']:
+              for node in batch:
+                  print(node['name'])
+          " | while read -r NAME; do
+            echo "⏳ [${NAME}] SSH 대기 중... (최대 30분)"
+            python3 scripts/wait_for_ssh.py "${NAME}" --timeout 30 || {
+              echo "❌ [${NAME}] SSH 연결 실패 (타임아웃)"
+              # 실패해도 나머지 노드 계속 대기
+              continue
+            }
+            echo "✅ [${NAME}] SSH 연결 성공"
+          done
+
+      - name: Netboot 비활성화 (전체 노드)
+        if: success()
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+        run: |
+          PLAN='${{ needs.pre-check.outputs.deploy_plan }}'
+
+          echo "$PLAN" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for batch in d['batches']:
+              for node in batch:
+                  print(node['name'])
+          " | while read -r NAME; do
+            echo "🔒 [${NAME}] Netboot 비활성화..."
+            python3 -c "
+          from scripts.cobbler_client import CobblerClient
+          import os
+          c = CobblerClient(os.environ['COBBLER_URL'], os.environ['COBBLER_USER'], os.environ['COBBLER_PASS'])
+          c.disable_netboot('${NAME}')
+          "
+          done
+
+          # 마지막에 Cobbler sync 한번만
+          python3 -c "
+          from scripts.cobbler_client import CobblerClient
+          import os
+          c = CobblerClient(os.environ['COBBLER_URL'], os.environ['COBBLER_USER'], os.environ['COBBLER_PASS'])
+          c.sync()
+          print('✅ Cobbler sync 완료')
+          "
+
+      - name: 배포 결과 요약
+        if: always()
+        run: |
+          PLAN='${{ needs.pre-check.outputs.deploy_plan }}'
+
+          echo "## 🚀 클러스터 배포 결과" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 항목 | 값 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-----|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 클러스터 | \`${{ inputs.cluster_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 프로파일 override | \`${{ inputs.profile_override || '없음 (기본값)' }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 롤링 배포 | ${{ needs.pre-check.outputs.rolling_enabled }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 총 배치 | ${{ needs.pre-check.outputs.total_batches }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 상태 | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 실행자 | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 시간 | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # 노드별 결과 테이블
+          echo "### 노드 목록" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 배치 | 서버 | 프로파일 | BMC IP |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|------|----------|--------|" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "$PLAN" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          for bi, batch in enumerate(d['batches'], 1):
+              for node in batch:
+                  print(f\"| {bi} | \`{node['name']}\` | \`{node['profile']}\` | \`{node['bmc_ip']}\` |\")
+          " >> "$GITHUB_STEP_SUMMARY"
