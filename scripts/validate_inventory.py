@@ -7,14 +7,12 @@ MAC/IP 중복, 프로파일 유효성, 파일명-name 일치 등을 검사한다
 
 import argparse
 import logging
-import os
-import re
 import sys
 from pathlib import Path
 from typing import Any
 
 import yaml
-from jsonschema import Draft7Validator, ValidationError
+from jsonschema import Draft7Validator
 
 logger = logging.getLogger(__name__)
 

@@ -11,10 +11,6 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
-from typing import Any
-
-import yaml
 
 from scripts.cobbler_client import CobblerClient
 from scripts.cobbler_diff import compute_diff, load_git_systems

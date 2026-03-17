@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import yaml
 
@@ -13,7 +13,6 @@ from scripts.cobbler_diff import (
     format_github,
     format_human,
     format_json,
-    load_git_systems,
 )
 
 
