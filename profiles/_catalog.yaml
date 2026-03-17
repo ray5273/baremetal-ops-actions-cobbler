@@ -1,0 +1,25 @@
+profiles:
+  - name: rhel9-x86_64
+    description: "Red Hat Enterprise Linux 9"
+    arch: x86_64
+    autoinstall: rhel9-default.ks
+
+  - name: rhel8-x86_64
+    description: "Red Hat Enterprise Linux 8"
+    arch: x86_64
+    autoinstall: rhel8-default.ks
+
+  - name: ubuntu2204-x86_64
+    description: "Ubuntu 22.04 LTS (Jammy Jellyfish)"
+    arch: x86_64
+    autoinstall: ubuntu2204.seed
+
+  - name: ubuntu2404-x86_64
+    description: "Ubuntu 24.04 LTS (Noble Numbat)"
+    arch: x86_64
+    autoinstall: ubuntu2404.seed
+
+  - name: rocky9-x86_64
+    description: "Rocky Linux 9"
+    arch: x86_64
+    autoinstall: rocky9-default.ks

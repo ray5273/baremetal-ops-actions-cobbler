@@ -1,0 +1,24 @@
+name: rack01-srv002
+profile: rhel9-x86_64
+hostname: rack01-srv002.ai-center.internal
+bmc_ip: "10.0.100.102"
+gateway: "10.0.1.1"
+name_servers:
+  - "10.0.0.53"
+  - "8.8.8.8"
+interfaces:
+  - name: ens1f0
+    mac_address: "aa:bb:cc:dd:ee:11"
+    ip_address: "10.0.1.102"
+    netmask: "255.255.255.0"
+    static: true
+  - name: ens1f1
+    mac_address: "aa:bb:cc:dd:ee:12"
+    ip_address: "10.0.2.102"
+    netmask: "255.255.255.0"
+    static: true
+tags:
+  - ceph-osd
+  - rack01
+boot_loader: grub
+comment: "Ceph OSD node #2"

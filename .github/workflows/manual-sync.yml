@@ -1,0 +1,149 @@
+name: "📡 Manual Cobbler Sync"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "실행 모드"
+        required: true
+        type: choice
+        options:
+          - "dry-run (변경사항 확인만)"
+          - "apply (실제 반영)"
+        default: "dry-run (변경사항 확인만)"
+      target:
+        description: "특정 시스템만 동기화 (비워두면 전체)"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  validate:
+    name: "📋 사전 검증"
+    runs-on: [self-hosted, linux, cobbler-mgmt]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip3 install -r requirements.txt
+
+      - name: Validate inventory YAML
+        run: python3 scripts/validate_inventory.py
+
+  diff:
+    name: "🔍 변경사항 확인"
+    needs: validate
+    runs-on: [self-hosted, linux, cobbler-mgmt]
+    outputs:
+      has_changes: ${{ steps.diff.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip3 install -r requirements.txt
+
+      - name: Cobbler Diff
+        id: diff
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+        run: |
+          TARGET_OPT=""
+          if [ -n "${{ inputs.target }}" ]; then
+            TARGET_OPT="--target ${{ inputs.target }}"
+          fi
+
+          python3 scripts/cobbler_diff.py --output-format human $TARGET_OPT | tee diff_output.txt
+
+          HAS=$(python3 scripts/cobbler_diff.py --output-format json $TARGET_OPT | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print('true' if len(d.get('creates',[]))+len(d.get('updates',[]))>0 else 'false')
+          ")
+          echo "has_changes=$HAS" >> "$GITHUB_OUTPUT"
+
+      - name: Diff 결과를 Step Summary에 출력
+        run: |
+          echo "## 🔄 Cobbler Sync Plan" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat diff_output.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**모드**: ${{ inputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**대상**: ${{ inputs.target || '전체' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**실행자**: ${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**시간**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    name: "🚀 Cobbler 반영"
+    needs: diff
+    if: contains(inputs.mode, 'apply') && needs.diff.outputs.has_changes == 'true'
+    runs-on: [self-hosted, linux, cobbler-mgmt]
+    environment: bare-metal-prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: pip3 install -r requirements.txt
+
+      - name: Apply 전 최종 diff 확인
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+        run: |
+          TARGET_OPT=""
+          if [ -n "${{ inputs.target }}" ]; then
+            TARGET_OPT="--target ${{ inputs.target }}"
+          fi
+          echo "=== 아래 변경사항을 Cobbler에 반영합니다 ==="
+          python3 scripts/cobbler_sync.py --dry-run $TARGET_OPT
+
+      - name: Cobbler에 변경사항 반영
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+        run: |
+          TARGET_OPT=""
+          if [ -n "${{ inputs.target }}" ]; then
+            TARGET_OPT="--target ${{ inputs.target }}"
+          fi
+          python3 scripts/cobbler_sync.py --apply $TARGET_OPT
+
+      - name: 반영 후 검증
+        env:
+          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
+          COBBLER_USER: ${{ secrets.COBBLER_USER }}
+          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+        run: |
+          echo "=== 동기화 후 상태 확인 ==="
+          python3 scripts/cobbler_diff.py --output-format human
+
+      - name: 결과 요약
+        if: always()
+        run: |
+          echo "## 📡 Cobbler Sync 결과" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 항목 | 값 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-----|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 모드 | apply |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 대상 | ${{ inputs.target || '전체' }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 상태 | ${{ job.status }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 실행자 | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 시간 | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> "$GITHUB_STEP_SUMMARY"
+
+  skip-apply:
+    name: "ℹ️ Apply 건너뜀"
+    needs: diff
+    if: contains(inputs.mode, 'dry-run') || needs.diff.outputs.has_changes != 'true'
+    runs-on: [self-hosted, linux, cobbler-mgmt]
+    steps:
+      - name: 상태 안내
+        run: |
+          if [[ "${{ inputs.mode }}" == *"dry-run"* ]]; then
+            echo "ℹ️ dry-run 모드로 실행되었습니다. 실제 반영은 되지 않았습니다."
+            echo "반영하려면 'apply' 모드로 다시 실행하세요."
+          else
+            echo "✅ 변경사항이 없습니다. Cobbler가 이미 Git과 동기화 상태입니다."
+          fi

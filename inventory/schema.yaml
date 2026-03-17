@@ -1,0 +1,72 @@
+type: object
+required:
+  - name
+  - profile
+  - hostname
+  - bmc_ip
+  - interfaces
+properties:
+  name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+    description: "Cobbler system name (예: rack01-srv001)"
+  profile:
+    type: string
+    description: "Cobbler profile name (예: rhel9-x86_64)"
+  hostname:
+    type: string
+    format: hostname
+    description: "FQDN (예: rack01-srv001.ai-center.internal)"
+  bmc_ip:
+    type: string
+    format: ipv4
+    description: "BMC/IPMI IP 주소"
+  gateway:
+    type: string
+    format: ipv4
+  name_servers:
+    type: array
+    items:
+      type: string
+      format: ipv4
+    default: ["8.8.8.8", "8.8.4.4"]
+  interfaces:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [name, mac_address, ip_address, netmask]
+      properties:
+        name:
+          type: string
+          description: "인터페이스 이름 (예: eth0, ens1f0)"
+        mac_address:
+          type: string
+          pattern: "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"
+        ip_address:
+          type: string
+          format: ipv4
+        netmask:
+          type: string
+          format: ipv4
+        static:
+          type: boolean
+          default: true
+        interface_type:
+          type: string
+          enum: [na, bond, bond_slave, bridge, bridge_slave]
+          default: na
+  tags:
+    type: array
+    items:
+      type: string
+    description: "서버 태그 (예: ceph-osd, gpu-node, rack01)"
+  boot_loader:
+    type: string
+    enum: [grub, pxelinux]
+    default: grub
+  autoinstall:
+    type: string
+    description: "커스텀 autoinstall 템플릿 (선택)"
+  comment:
+    type: string
