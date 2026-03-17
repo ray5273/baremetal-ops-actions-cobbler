@@ -54,7 +54,7 @@ class CobblerClient:
             시스템 정보 딕셔너리, 없으면 None
         """
         try:
-            result = self.server.get_system(name)
+            result: dict = self.server.get_system(name)  # type: ignore[assignment]
             if result and result != "~":
                 logger.info("시스템 조회 성공: %s", name)
                 return result
@@ -65,13 +65,13 @@ class CobblerClient:
 
     def list_systems(self) -> list:
         """모든 시스템 목록을 조회한다."""
-        systems = self.server.get_systems()
+        systems: list = self.server.get_systems()  # type: ignore[assignment]
         logger.info("시스템 목록 조회: %d개", len(systems))
         return systems
 
     def list_profiles(self) -> list:
         """모든 프로파일 목록을 조회한다."""
-        profiles = self.server.get_profiles()
+        profiles: list = self.server.get_profiles()  # type: ignore[assignment]
         logger.info("프로파일 목록 조회: %d개", len(profiles))
         return profiles
 
@@ -194,7 +194,7 @@ class CobblerClient:
     def get_system_status(self, name: str) -> dict:
         """시스템의 렌더링된 상태를 조회한다."""
         try:
-            result = self.server.get_system_as_rendered(name, self.token)
+            result: dict = self.server.get_system_as_rendered(name, self.token)  # type: ignore[assignment]
             return result
         except xmlrpc.client.Fault:
             logger.warning("시스템 상태 조회 실패: %s", name)
