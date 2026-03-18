@@ -27,7 +27,7 @@ jobs:
   # ────────────────────────────────────────────
   pre-check:
     name: "🔍 사전 검증 & 배포 계획"
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     outputs:
       deploy_plan: ${{ steps.plan.outputs.plan }}
       total_batches: ${{ steps.plan.outputs.total_batches }}
@@ -104,7 +104,7 @@ jobs:
   deploy-cluster:
     name: "🚀 클러스터 배포"
     needs: pre-check
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     environment: bare-metal-prod
     steps:
       - uses: actions/checkout@v4
