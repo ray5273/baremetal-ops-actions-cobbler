@@ -1,0 +1,12 @@
+name: r4-cluster
+description: "Rack 4 GPU 컴퓨트 클러스터"
+default_profile: ubuntu2204-x86_64
+use_efi: true
+rolling:
+  enabled: false
+nodes:
+  - name: rack02-srv001
+tags:
+  - rack4
+  - production
+  - gpu

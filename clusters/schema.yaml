@@ -1,0 +1,60 @@
+type: object
+required:
+  - name
+  - description
+  - default_profile
+  - nodes
+properties:
+  name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+    description: "클러스터 이름 (예: r3-cluster)"
+  description:
+    type: string
+    description: "클러스터 설명"
+  default_profile:
+    type: string
+    description: "기본 OS 프로파일 (노드별 override 가능)"
+  use_efi:
+    type: boolean
+    default: true
+    description: "EFI 부팅 사용 여부"
+  rolling:
+    type: object
+    properties:
+      enabled:
+        type: boolean
+        default: false
+        description: "롤링 배포 활성화 여부"
+      batch_size:
+        type: integer
+        minimum: 1
+        default: 1
+        description: "한 번에 배포할 노드 수"
+      pause_between_batches:
+        type: boolean
+        default: false
+        description: "배치 간 수동 승인 대기 여부"
+    additionalProperties: false
+  nodes:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+          description: "inventory/systems/에 정의된 서버 이름"
+        profile_override:
+          type: string
+          description: "이 노드에만 적용할 OS 프로파일 (default_profile 대신)"
+      additionalProperties: false
+  tags:
+    type: array
+    items:
+      type: string
+    description: "클러스터 태그"
+additionalProperties: false

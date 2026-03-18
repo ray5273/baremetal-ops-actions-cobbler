@@ -9,10 +9,14 @@ on:
       - "kickstarts/**"
       - "scripts/**"
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   validate:
     name: "📋 YAML 스키마 검증"
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,35 +29,75 @@ jobs:
   diff-preview:
     name: "🔍 Cobbler Diff Preview"
     needs: validate
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: pip3 install -r requirements.txt
 
+      - name: Build Cobbler test image
+        run: docker build -t cobbler-test:local docker/cobbler-test/
+
+      - name: Start Cobbler server
+        run: |
+          docker run -d --name cobbler --privileged \
+            -p 80:80 -p 443:443 \
+            cobbler-test:local
+          echo "Cobbler container started"
+          # cobblerd + Apache 시작 대기
+          echo "서비스 시작 대기 중 (15초)..."
+          sleep 15
+          echo "--- 컨테이너 진단 ---"
+          docker exec cobbler supervisorctl status || true
+          docker exec cobbler ss -tlnp 2>/dev/null || docker exec cobbler netstat -tlnp 2>/dev/null || true
+          docker logs cobbler 2>&1 | tail -20
+          echo "--- 진단 종료 ---"
+
+      - name: Create dummy kernel/initrd files in container
+        run: |
+          for PROFILE in rhel9-x86_64 rhel8-x86_64 ubuntu2204-x86_64 ubuntu2404-x86_64 rocky9-x86_64; do
+            docker exec cobbler mkdir -p "/var/www/cobbler/distro_mirror/${PROFILE}"
+            docker exec cobbler dd if=/dev/zero of="/var/www/cobbler/distro_mirror/${PROFILE}/vmlinuz" bs=1 count=1 2>/dev/null
+            docker exec cobbler dd if=/dev/zero of="/var/www/cobbler/distro_mirror/${PROFILE}/initrd.img" bs=1 count=1 2>/dev/null
+          done
+
+      - name: Setup Cobbler test data
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 scripts/ci/setup_cobbler_data.py
+
       - name: Generate diff
         id: diff
         env:
-          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
-          COBBLER_USER: ${{ secrets.COBBLER_USER }}
-          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
         run: |
-          python3 scripts/cobbler_diff.py --output-format github > diff_output.txt
+          python3 -m scripts.cobbler_diff --output-format github > diff_output.txt
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
           cat diff_output.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Post diff as PR comment
         uses: actions/github-script@v7
+        env:
+          DIFF_OUTPUT: ${{ steps.diff.outputs.diff }}
         with:
           script: |
-            const diff = `${{ steps.diff.outputs.diff }}`;
+            const diff = process.env.DIFF_OUTPUT || '';
             if (diff.trim()) {
+              const body = '## 🔄 Cobbler Sync Plan\n\n```\n' + diff + '\n```\n\n⚠️ 이 변경사항을 Cobbler에 반영하려면 merge 후 **Manual Cobbler Sync** 워크플로우를 수동으로 실행하세요.';
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: `## 🔄 Cobbler Sync Plan\n\n\`\`\`\n${diff}\n\`\`\`\n\n⚠️ 이 변경사항을 Cobbler에 반영하려면 merge 후 **Manual Cobbler Sync** 워크플로우를 수동으로 실행하세요.`
+                body: body
               });
             }
+
+      - name: Cleanup Cobbler container
+        if: always()
+        run: docker rm -f cobbler || true

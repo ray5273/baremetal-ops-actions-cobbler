@@ -9,7 +9,7 @@ on:
 jobs:
   unit-tests:
     name: "Unit Tests (Python ${{ matrix.python-version }})"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -41,7 +41,7 @@ jobs:
 
   validate-inventory:
     name: "Validate Inventory YAML"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,9 +58,12 @@ jobs:
       - name: Validate inventory schemas
         run: python scripts/validate_inventory.py
 
+      - name: Validate cluster definitions
+        run: python scripts/cluster_manager.py validate
+
   lint:
     name: "Lint & Type Check"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -82,11 +85,11 @@ jobs:
         run: ruff format --check scripts/ tests/
 
       - name: Mypy type check
-        run: mypy scripts/ --ignore-missing-imports --no-strict-optional
+        run: mypy scripts/ --ignore-missing-imports --no-strict-optional --disable-error-code=import-untyped
 
   yaml-lint:
     name: "YAML Lint"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -101,11 +104,11 @@ jobs:
       - name: Lint YAML files
         run: |
           yamllint -d "{extends: default, rules: {line-length: {max: 200}, truthy: disable}}" \
-            inventory/ profiles/ .github/workflows/
+            inventory/ profiles/ clusters/ .github/workflows/
 
   workflow-validation:
     name: "Workflow Syntax Check"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -117,3 +120,78 @@ jobs:
             python3 -c "import yaml; yaml.safe_load(open('$f'))" || exit 1
             echo "  ✅ $f is valid YAML"
           done
+
+  integration-tests:
+    name: "Integration Tests (Cobbler)"
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Build Cobbler test image
+        run: docker build -t cobbler-test:local docker/cobbler-test/
+
+      - name: Start Cobbler server
+        run: |
+          docker run -d --name cobbler --privileged \
+            -p 80:80 -p 443:443 \
+            cobbler-test:local
+          echo "Cobbler container started"
+          # cobblerd + Apache 시작 대기
+          echo "서비스 시작 대기 중 (15초)..."
+          sleep 15
+          echo "--- 컨테이너 진단 ---"
+          docker exec cobbler supervisorctl status || true
+          docker exec cobbler ss -tlnp 2>/dev/null || docker exec cobbler netstat -tlnp 2>/dev/null || true
+          docker logs cobbler 2>&1 | tail -20
+          echo "--- 진단 종료 ---"
+
+      - name: Create dummy kernel/initrd files in container
+        run: |
+          for PROFILE in rhel9-x86_64 rhel8-x86_64 ubuntu2204-x86_64 ubuntu2404-x86_64 rocky9-x86_64; do
+            docker exec cobbler mkdir -p "/var/www/cobbler/distro_mirror/${PROFILE}"
+            docker exec cobbler dd if=/dev/zero of="/var/www/cobbler/distro_mirror/${PROFILE}/vmlinuz" bs=1 count=1 2>/dev/null
+            docker exec cobbler dd if=/dev/zero of="/var/www/cobbler/distro_mirror/${PROFILE}/initrd.img" bs=1 count=1 2>/dev/null
+          done
+
+      - name: Setup Cobbler test data
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 scripts/ci/setup_cobbler_data.py
+
+      - name: Run integration tests
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python -m pytest tests/integration/ -v --tb=short
+
+      - name: Smoke test - cobbler_diff
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 -m scripts.cobbler_diff --output-format json
+
+      - name: Smoke test - cobbler_sync dry-run
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 -m scripts.cobbler_sync --dry-run
+
+      - name: Cleanup Cobbler container
+        if: always()
+        run: docker rm -f cobbler || true

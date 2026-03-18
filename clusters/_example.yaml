@@ -1,0 +1,15 @@
+# 클러스터 정의 예시 (언더스코어 프리픽스 → 검증/배포에서 제외)
+name: example-cluster
+description: "예시 클러스터"
+default_profile: rhel9-x86_64
+use_efi: true
+rolling:
+  enabled: true
+  batch_size: 1
+  pause_between_batches: false
+nodes:
+  - name: rack01-srv001
+    profile_override: ubuntu2204-x86_64
+  - name: rack01-srv002
+tags:
+  - example

@@ -1,0 +1,16 @@
+name: r6-1-cluster
+description: "Rack 6-1 하이브리드 클러스터"
+default_profile: rocky9-x86_64
+use_efi: true
+rolling:
+  enabled: true
+  batch_size: 2
+  pause_between_batches: false
+nodes:
+  - name: rack01-srv001
+  - name: rack01-srv002
+  - name: rack02-srv001
+tags:
+  - rack6-1
+  - production
+  - hybrid
