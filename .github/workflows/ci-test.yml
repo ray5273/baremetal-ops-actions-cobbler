@@ -167,7 +167,9 @@ jobs:
           exit 1
 
       - name: Setup Cobbler test data
-        run: docker exec cobbler bash < scripts/ci/setup-cobbler.sh
+        run: |
+          docker cp scripts/ci/setup-cobbler.sh cobbler:/tmp/setup-cobbler.sh
+          docker exec cobbler bash /tmp/setup-cobbler.sh
 
       - name: Run integration tests
         env:
