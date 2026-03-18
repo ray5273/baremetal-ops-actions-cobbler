@@ -25,6 +25,7 @@ jobs:
   diff-preview:
     name: "🔍 Cobbler Diff Preview"
     needs: validate
+    if: ${{ secrets.COBBLER_API_URL != '' }}
     runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
