@@ -138,11 +138,14 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+      - name: Build Cobbler test image
+        run: docker build -t cobbler-test:local docker/cobbler-test/
+
       - name: Start Cobbler server
         run: |
           docker run -d --name cobbler --privileged \
             -p 80:80 -p 443:443 \
-            wy-z/docker-cobbler:3.3.3
+            cobbler-test:local
           echo "Cobbler container started"
 
       - name: Wait for Cobbler API
