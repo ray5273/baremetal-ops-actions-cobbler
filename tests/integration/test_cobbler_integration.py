@@ -65,7 +65,6 @@ class TestCobblerClientIntegration(unittest.TestCase):
             ],
         }
         self.client.add_system(config)
-        self.client.sync()
 
         system = self.client.get_system("test-integration-srv")
         self.assertIsNotNone(system)
@@ -89,7 +88,6 @@ class TestCobblerClientIntegration(unittest.TestCase):
             ],
         }
         self.client.add_system(config)
-        self.client.sync()
 
         self.client.remove_system("test-remove-srv")
         system = self.client.get_system("test-remove-srv")
@@ -115,13 +113,12 @@ class TestCobblerDiffIntegration(unittest.TestCase):
 
     def test_diff_detects_creates(self):
         """Git에 정의된 시스템이 Cobbler에 없으면 CREATE로 감지되는지 확인."""
-        from scripts.cobbler_diff import compute_diff, load_git_systems
+        from scripts.cobbler_diff import compute_diff
 
         systems_dir = os.path.join(
             os.path.dirname(__file__), "..", "..", "inventory", "systems"
         )
-        git_systems = load_git_systems(systems_dir)
-        diff = compute_diff(self.client, git_systems)
+        diff = compute_diff(systems_dir, self.client)
 
         # 초기 상태이므로 모든 Git 시스템이 create에 있어야 함
         create_names = [c["name"] for c in diff["creates"]]
@@ -129,13 +126,12 @@ class TestCobblerDiffIntegration(unittest.TestCase):
 
     def test_diff_json_output(self):
         """JSON 출력 포맷이 올바른 키를 포함하는지 확인."""
-        from scripts.cobbler_diff import compute_diff, load_git_systems
+        from scripts.cobbler_diff import compute_diff
 
         systems_dir = os.path.join(
             os.path.dirname(__file__), "..", "..", "inventory", "systems"
         )
-        git_systems = load_git_systems(systems_dir)
-        diff = compute_diff(self.client, git_systems)
+        diff = compute_diff(systems_dir, self.client)
 
         self.assertIn("creates", diff)
         self.assertIn("updates", diff)
@@ -160,7 +156,7 @@ class TestCobblerSyncIntegration(unittest.TestCase):
             os.path.dirname(__file__), "..", "..", "inventory", "systems"
         )
         git_systems = load_git_systems(systems_dir)
-        diff = compute_diff(self.client, git_systems)
+        diff = compute_diff(systems_dir, self.client)
 
         before_count = len(self.client.list_systems())
         apply_creates(self.client, diff["creates"], git_systems, dry_run=True)
