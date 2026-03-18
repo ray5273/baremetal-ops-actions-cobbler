@@ -46,28 +46,20 @@ jobs:
             cobbler-test:local
           echo "Cobbler container started"
 
-      - name: Wait for Cobbler API
+      - name: Create dummy kernel/initrd files in container
         run: |
-          echo "Cobbler API 준비 대기 중..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost/cobbler_api >/dev/null 2>&1; then
-              echo "Cobbler API ready"
-              exit 0
-            fi
-            echo "  대기 중... ($i/30)"
-            sleep 2
+          for PROFILE in rhel9-x86_64 rhel8-x86_64 ubuntu2204-x86_64 ubuntu2404-x86_64 rocky9-x86_64; do
+            docker exec cobbler mkdir -p "/var/www/cobbler/distro_mirror/${PROFILE}"
+            docker exec cobbler dd if=/dev/zero of="/var/www/cobbler/distro_mirror/${PROFILE}/vmlinuz" bs=1 count=1 2>/dev/null
+            docker exec cobbler dd if=/dev/zero of="/var/www/cobbler/distro_mirror/${PROFILE}/initrd.img" bs=1 count=1 2>/dev/null
           done
-          echo "ERROR: Cobbler API 시작 시간 초과"
-          docker logs cobbler
-          docker exec cobbler cat /var/log/apache2/error.log 2>/dev/null || true
-          docker exec cobbler cat /etc/apache2/conf-available/cobbler.conf 2>/dev/null || true
-          docker exec cobbler supervisorctl status 2>/dev/null || true
-          exit 1
 
       - name: Setup Cobbler test data
-        run: |
-          docker cp scripts/ci/setup-cobbler.sh cobbler:/tmp/setup-cobbler.sh
-          docker exec cobbler bash /tmp/setup-cobbler.sh
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 scripts/ci/setup_cobbler_data.py
 
       - name: Generate diff
         id: diff
