@@ -7,7 +7,7 @@ def application(environ, start_response):
         try:
             content_length = int(environ.get("CONTENT_LENGTH", 0))
             request_body = environ["wsgi.input"].read(content_length)
-            conn = http.client.HTTPConnection("127.0.0.1", 25151)
+            conn = http.client.HTTPConnection("127.0.0.1", 25151, timeout=10)
             conn.request(
                 "POST", "/", body=request_body,
                 headers={"Content-Type": "text/xml"},

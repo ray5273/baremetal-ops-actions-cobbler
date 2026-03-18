@@ -5,6 +5,7 @@ Apache/WSGI를 통해 Cobbler XMLRPC API에 접속하여 테스트용 distro/pro
 컨테이너 외부(CI runner)에서 실행된다.
 """
 import os
+import socket
 import sys
 import time
 import xmlrpc.client
@@ -21,8 +22,11 @@ PROFILES = [
     "rocky9-x86_64",
 ]
 
+# 소켓 타임아웃 설정 (초) - XMLRPC 호출이 hang되는 것을 방지
+socket.setdefaulttimeout(15)
 
-def wait_for_api(url: str, max_retries: int = 30, delay: int = 2) -> xmlrpc.client.ServerProxy:
+
+def wait_for_api(url: str, max_retries: int = 60, delay: int = 2) -> xmlrpc.client.ServerProxy:
     """Cobbler XMLRPC API가 응답할 때까지 대기."""
     print(f"Cobbler API 대기 중: {url}")
     server = xmlrpc.client.ServerProxy(url)
@@ -34,7 +38,7 @@ def wait_for_api(url: str, max_retries: int = 30, delay: int = 2) -> xmlrpc.clie
                 print(f"Cobbler API 준비 완료 (attempt {i}/{max_retries})")
                 return server
         except Exception as e:
-            print(f"  대기 중... ({i}/{max_retries}): {e}")
+            print(f"  대기 중... ({i}/{max_retries}): {type(e).__name__}: {e}")
             time.sleep(delay)
     print("ERROR: Cobbler API 시작 시간 초과")
     sys.exit(1)

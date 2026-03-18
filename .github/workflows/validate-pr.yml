@@ -45,6 +45,14 @@ jobs:
             -p 80:80 -p 443:443 \
             cobbler-test:local
           echo "Cobbler container started"
+          # cobblerd + Apache 시작 대기
+          echo "서비스 시작 대기 중 (15초)..."
+          sleep 15
+          echo "--- 컨테이너 진단 ---"
+          docker exec cobbler supervisorctl status || true
+          docker exec cobbler ss -tlnp 2>/dev/null || docker exec cobbler netstat -tlnp 2>/dev/null || true
+          docker logs cobbler 2>&1 | tail -20
+          echo "--- 진단 종료 ---"
 
       - name: Create dummy kernel/initrd files in container
         run: |
