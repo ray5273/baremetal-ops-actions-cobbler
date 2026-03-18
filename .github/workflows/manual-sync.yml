@@ -20,7 +20,7 @@ on:
 jobs:
   validate:
     name: "📋 사전 검증"
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +33,7 @@ jobs:
   diff:
     name: "🔍 변경사항 확인"
     needs: validate
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     outputs:
       has_changes: ${{ steps.diff.outputs.has_changes }}
     steps:
@@ -79,7 +79,7 @@ jobs:
     name: "🚀 Cobbler 반영"
     needs: diff
     if: contains(inputs.mode, 'apply') && needs.diff.outputs.has_changes == 'true'
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     environment: bare-metal-prod
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +137,7 @@ jobs:
     name: "ℹ️ Apply 건너뜀"
     needs: diff
     if: contains(inputs.mode, 'dry-run') || needs.diff.outputs.has_changes != 'true'
-    runs-on: [self-hosted, linux, cobbler-mgmt]
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
       - name: 상태 안내
         run: |
