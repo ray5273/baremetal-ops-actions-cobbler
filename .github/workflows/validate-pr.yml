@@ -39,7 +39,7 @@ jobs:
           COBBLER_USER: ${{ secrets.COBBLER_USER }}
           COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
         run: |
-          python3 scripts/cobbler_diff.py --output-format github > diff_output.txt
+          python3 -m scripts.cobbler_diff --output-format github > diff_output.txt
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
           cat diff_output.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
