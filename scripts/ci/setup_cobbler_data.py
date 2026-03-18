@@ -96,7 +96,7 @@ def main() -> None:
 
     # 결과 확인
     profiles = server.get_profiles(token)
-    print(f"\n=== Cobbler CI 초기화 완료 ===")
+    print("\n=== Cobbler CI 초기화 완료 ===")
     print(f"생성된 프로파일: {[p['name'] for p in profiles]}")
 
 
