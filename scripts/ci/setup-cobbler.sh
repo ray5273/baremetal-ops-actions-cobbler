@@ -29,7 +29,19 @@ if [ -f /etc/cobbler/modules.conf ]; then
   elif command -v supervisorctl &>/dev/null; then
     supervisorctl restart cobblerd 2>/dev/null || true
   fi
-  sleep 3
+  # cobblerd가 재시작 완료될 때까지 대기
+  echo "cobblerd 재시작 대기 중..."
+  for i in $(seq 1 30); do
+    if cobbler distro list &>/dev/null; then
+      echo "cobblerd 재시작 완료"
+      break
+    fi
+    if [ "$i" -eq 30 ]; then
+      echo "ERROR: cobblerd 재시작 시간 초과"
+      exit 1
+    fi
+    sleep 2
+  done
 fi
 
 # 더미 distro + profile 생성
@@ -45,17 +57,27 @@ for PROFILE in "${PROFILES[@]}"; do
   dd if=/dev/zero of="${DISTRO_DIR}/vmlinuz" bs=1 count=1 2>/dev/null
   dd if=/dev/zero of="${DISTRO_DIR}/initrd.img" bs=1 count=1 2>/dev/null
 
-  # distro 생성
-  cobbler distro add \
-    --name "${PROFILE}" \
-    --kernel "${DISTRO_DIR}/vmlinuz" \
-    --initrd "${DISTRO_DIR}/initrd.img" \
-    --arch x86_64 || echo "  distro already exists: ${PROFILE}"
+  # distro 생성 (이미 존재하면 skip)
+  if ! cobbler distro report --name "${PROFILE}" &>/dev/null; then
+    cobbler distro add \
+      --name "${PROFILE}" \
+      --kernel "${DISTRO_DIR}/vmlinuz" \
+      --initrd "${DISTRO_DIR}/initrd.img" \
+      --arch x86_64
+    echo "  distro 생성 완료: ${PROFILE}"
+  else
+    echo "  distro 이미 존재: ${PROFILE}"
+  fi
 
-  # profile 생성
-  cobbler profile add \
-    --name "${PROFILE}" \
-    --distro "${PROFILE}" || echo "  profile already exists: ${PROFILE}"
+  # profile 생성 (이미 존재하면 skip)
+  if ! cobbler profile report --name "${PROFILE}" &>/dev/null; then
+    cobbler profile add \
+      --name "${PROFILE}" \
+      --distro "${PROFILE}"
+    echo "  profile 생성 완료: ${PROFILE}"
+  else
+    echo "  profile 이미 존재: ${PROFILE}"
+  fi
 done
 
 # sync 실행
