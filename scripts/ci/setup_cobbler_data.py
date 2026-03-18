@@ -26,17 +26,20 @@ PROFILES = [
 socket.setdefaulttimeout(15)
 
 
-def wait_for_api(url: str, max_retries: int = 60, delay: int = 2) -> xmlrpc.client.ServerProxy:
-    """Cobbler XMLRPC API가 응답할 때까지 대기."""
+def wait_for_api(url: str, user: str, password: str, max_retries: int = 30, delay: int = 2) -> tuple:
+    """Cobbler XMLRPC API가 응답할 때까지 대기. (server, token) 반환."""
     print(f"Cobbler API 대기 중: {url}")
     server = xmlrpc.client.ServerProxy(url)
     for i in range(1, max_retries + 1):
         try:
-            # 실제 XMLRPC 메서드 호출로 cobblerd 응답 확인
-            methods = server.system.listMethods()
-            if methods:
+            # Cobbler의 login() 메서드로 API 준비 상태 확인
+            token = server.login(user, password)
+            if token:
                 print(f"Cobbler API 준비 완료 (attempt {i}/{max_retries})")
-                return server
+                return server, token
+        except xmlrpc.client.Fault as e:
+            print(f"  대기 중... ({i}/{max_retries}): Fault: {e}")
+            time.sleep(delay)
         except Exception as e:
             print(f"  대기 중... ({i}/{max_retries}): {type(e).__name__}: {e}")
             time.sleep(delay)
@@ -78,11 +81,7 @@ def setup_test_data(server: xmlrpc.client.ServerProxy, token: str) -> None:
 def main() -> None:
     print("=== Cobbler CI 초기화 시작 ===")
 
-    server = wait_for_api(COBBLER_URL)
-
-    # 인증
-    print("로그인 중...")
-    token = server.login(COBBLER_USER, COBBLER_PASS)
+    server, token = wait_for_api(COBBLER_URL, COBBLER_USER, COBBLER_PASS)
     print(f"로그인 성공 (token: {token[:20]}...)")
 
     setup_test_data(server, token)
