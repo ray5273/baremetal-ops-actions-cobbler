@@ -4,6 +4,7 @@
 Apache/WSGI를 통해 Cobbler XMLRPC API에 접속하여 테스트용 distro/profile을 생성한다.
 컨테이너 외부(CI runner)에서 실행된다.
 """
+
 import os
 import socket
 import sys
@@ -26,7 +27,9 @@ PROFILES = [
 socket.setdefaulttimeout(15)
 
 
-def wait_for_api(url: str, user: str, password: str, max_retries: int = 30, delay: int = 2) -> tuple:
+def wait_for_api(
+    url: str, user: str, password: str, max_retries: int = 30, delay: int = 2
+) -> tuple:
     """Cobbler XMLRPC API가 응답할 때까지 대기. (server, token) 반환."""
     print(f"Cobbler API 대기 중: {url}")
     server = xmlrpc.client.ServerProxy(url)
@@ -58,8 +61,18 @@ def setup_test_data(server: xmlrpc.client.ServerProxy, token: str) -> None:
             # 더미 kernel/initrd 경로 (컨테이너 내부에 생성해야 함)
             distro_id = server.new_distro(token)
             server.modify_distro(distro_id, "name", name, token)
-            server.modify_distro(distro_id, "kernel", f"/var/www/cobbler/distro_mirror/{name}/vmlinuz", token)
-            server.modify_distro(distro_id, "initrd", f"/var/www/cobbler/distro_mirror/{name}/initrd.img", token)
+            server.modify_distro(
+                distro_id,
+                "kernel",
+                f"/var/www/cobbler/distro_mirror/{name}/vmlinuz",
+                token,
+            )
+            server.modify_distro(
+                distro_id,
+                "initrd",
+                f"/var/www/cobbler/distro_mirror/{name}/initrd.img",
+                token,
+            )
             server.modify_distro(distro_id, "arch", "x86_64", token)
             server.save_distro(distro_id, token)
             print(f"  distro 생성 완료: {name}")
