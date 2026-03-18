@@ -72,9 +72,18 @@ COPY config/boot_loader_conf/ /etc/cobbler/boot_loader_conf/
 RUN printf '[cobbler]\ngitdate = Thu Jan 01 00:00:00 2023 +0000\ngitstamp = 0000000\nbuilddate = Thu Jan 01 00:00:00 2023\nversion = 3.3.7\nversion_tuple = [3, 3, 7]\n' \
     > /etc/cobbler/version
 
-# Enable auto_migrate and fix tftpboot path placeholder in settings
+# Enable auto_migrate and resolve all path placeholders in settings
 RUN sed -i 's/auto_migrate_settings: false/auto_migrate_settings: true/' /etc/cobbler/settings.yaml && \
-    sed -i 's|@@tftproot@@|/var/lib/tftpboot|g' /etc/cobbler/settings.yaml
+    sed -i 's|@@tftproot@@|/var/lib/tftpboot|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@webroot@@|/var/www|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@syslinux_dir@@|/usr/lib/syslinux|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@memdisk_folder@@|/usr/lib/syslinux|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@pxelinux_folder@@|/usr/lib/syslinux|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@grub_mod_folder@@|/usr/lib/grub|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@shim_folder@@|/usr/lib/shim|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@shim_file@@|shimx64.efi|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@ipxe_folder@@|/usr/lib/ipxe|g' /etc/cobbler/settings.yaml && \
+    sed -i 's|@@bind_zonefiles@@|/var/named|g' /etc/cobbler/settings.yaml
 
 # Generate self-signed SSL certificate for Apache
 RUN mkdir -p /etc/pki/tls/certs /etc/pki/tls/private && \
