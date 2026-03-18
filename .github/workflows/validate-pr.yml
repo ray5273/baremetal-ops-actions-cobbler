@@ -32,12 +32,37 @@ jobs:
       - name: Install dependencies
         run: pip3 install -r requirements.txt
 
+      - name: Start Cobbler server
+        run: |
+          docker run -d --name cobbler --privileged \
+            -p 80:80 -p 443:443 \
+            wy-z/docker-cobbler:3.3.3
+          echo "Cobbler container started"
+
+      - name: Wait for Cobbler API
+        run: |
+          echo "Cobbler API 준비 대기 중..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost/cobbler_api >/dev/null 2>&1; then
+              echo "Cobbler API ready"
+              exit 0
+            fi
+            echo "  대기 중... ($i/30)"
+            sleep 2
+          done
+          echo "ERROR: Cobbler API 시작 시간 초과"
+          docker logs cobbler
+          exit 1
+
+      - name: Setup Cobbler test data
+        run: docker exec cobbler bash < scripts/ci/setup-cobbler.sh
+
       - name: Generate diff
         id: diff
         env:
-          COBBLER_URL: ${{ secrets.COBBLER_API_URL }}
-          COBBLER_USER: ${{ secrets.COBBLER_USER }}
-          COBBLER_PASS: ${{ secrets.COBBLER_PASS }}
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
         run: |
           python3 -m scripts.cobbler_diff --output-format github > diff_output.txt
           echo "diff<<EOF" >> "$GITHUB_OUTPUT"
@@ -57,3 +82,7 @@ jobs:
                 body: `## 🔄 Cobbler Sync Plan\n\n\`\`\`\n${diff}\n\`\`\`\n\n⚠️ 이 변경사항을 Cobbler에 반영하려면 merge 후 **Manual Cobbler Sync** 워크플로우를 수동으로 실행하세요.`
               });
             }
+
+      - name: Cleanup Cobbler container
+        if: always()
+        run: docker rm -f cobbler || true

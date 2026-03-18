@@ -120,3 +120,70 @@ jobs:
             python3 -c "import yaml; yaml.safe_load(open('$f'))" || exit 1
             echo "  ✅ $f is valid YAML"
           done
+
+  integration-tests:
+    name: "Integration Tests (Cobbler)"
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Start Cobbler server
+        run: |
+          docker run -d --name cobbler --privileged \
+            -p 80:80 -p 443:443 \
+            wy-z/docker-cobbler:3.3.3
+          echo "Cobbler container started"
+
+      - name: Wait for Cobbler API
+        run: |
+          echo "Cobbler API 준비 대기 중..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost/cobbler_api >/dev/null 2>&1; then
+              echo "Cobbler API ready"
+              exit 0
+            fi
+            echo "  대기 중... ($i/30)"
+            sleep 2
+          done
+          echo "ERROR: Cobbler API 시작 시간 초과"
+          docker logs cobbler
+          exit 1
+
+      - name: Setup Cobbler test data
+        run: docker exec cobbler bash < scripts/ci/setup-cobbler.sh
+
+      - name: Run integration tests
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python -m pytest tests/integration/ -v --tb=short
+
+      - name: Smoke test - cobbler_diff
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 -m scripts.cobbler_diff --output-format json
+
+      - name: Smoke test - cobbler_sync dry-run
+        env:
+          COBBLER_URL: http://localhost/cobbler_api
+          COBBLER_USER: cobbler
+          COBBLER_PASS: cobbler
+        run: python3 -m scripts.cobbler_sync --dry-run
+
+      - name: Cleanup Cobbler container
+        if: always()
+        run: docker rm -f cobbler || true
