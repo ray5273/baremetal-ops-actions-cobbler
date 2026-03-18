@@ -9,7 +9,7 @@ on:
 jobs:
   unit-tests:
     name: "Unit Tests (Python ${{ matrix.python-version }})"
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -41,7 +41,7 @@ jobs:
 
   validate-inventory:
     name: "Validate Inventory YAML"
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -63,7 +63,7 @@ jobs:
 
   lint:
     name: "Lint & Type Check"
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -89,7 +89,7 @@ jobs:
 
   yaml-lint:
     name: "YAML Lint"
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -108,7 +108,7 @@ jobs:
 
   workflow-validation:
     name: "Workflow Syntax Check"
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 

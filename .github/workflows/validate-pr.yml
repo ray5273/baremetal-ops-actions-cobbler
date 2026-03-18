@@ -12,7 +12,7 @@ on:
 jobs:
   validate:
     name: "📋 YAML 스키마 검증"
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +25,7 @@ jobs:
   diff-preview:
     name: "🔍 Cobbler Diff Preview"
     needs: validate
-    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'self-hosted' }}
     steps:
       - uses: actions/checkout@v4
 
