@@ -55,6 +55,8 @@ jobs:
           done
           echo "ERROR: Cobbler API 시작 시간 초과"
           docker logs cobbler
+          docker exec cobbler cat /var/log/httpd/error_log 2>/dev/null || true
+          docker exec cobbler cat /etc/httpd/conf.d/cobbler.conf 2>/dev/null || true
           exit 1
 
       - name: Setup Cobbler test data
