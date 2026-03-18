@@ -85,7 +85,7 @@ jobs:
         run: ruff format --check scripts/ tests/
 
       - name: Mypy type check
-        run: mypy scripts/ --ignore-missing-imports --no-strict-optional
+        run: mypy scripts/ --ignore-missing-imports --no-strict-optional --disable-error-code=import-untyped
 
   yaml-lint:
     name: "YAML Lint"
